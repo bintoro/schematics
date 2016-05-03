@@ -293,7 +293,7 @@ def test_explicit_values_override_defaults():
 
 
 def test_good_options_args():
-    mo = ModelOptions(klass=None, roles=None)
+    mo = ModelOptions(roles=None)
     assert mo is not None
 
     assert mo.roles == {}
@@ -301,7 +301,6 @@ def test_good_options_args():
 
 def test_bad_options_args():
     args = {
-        'klass': None,
         'roles': None,
         'badkw': None,
     }
@@ -312,7 +311,7 @@ def test_bad_options_args():
 
 def test_no_options_args():
     args = {}
-    mo = ModelOptions(None, **args)
+    mo = ModelOptions(**args)
     assert mo is not None
 
 
@@ -334,10 +333,10 @@ def test_options_parsing_from_model():
 def test_options_parsing_from_optionsclass():
     class FooOptions(ModelOptions):
 
-        def __init__(self, klass, **kwargs):
+        def __init__(self, **kwargs):
             kwargs['namespace'] = kwargs.get('namespace') or 'foo'
             kwargs['roles'] = kwargs.get('roles') or {}
-            super(FooOptions, self).__init__(klass, **kwargs)
+            super(FooOptions, self).__init__(**kwargs)
 
     class Foo(Model):
         __optionsclass__ = FooOptions

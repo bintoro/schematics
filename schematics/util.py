@@ -62,6 +62,13 @@ def listify(value):
         return [value]
 
 
+def merge_dicts(*args):
+    target, sources = args[0], args[1:]
+    for source in sources:
+        target.update(source)
+    return target
+
+
 def module_exports(module_name):
     module_globals = sys.modules[module_name].__dict__
     return [
@@ -80,6 +87,14 @@ def package_exports(package_name):
           and (getattr(obj, '__module__', '').startswith(package_name + '.')
                 or isinstance(obj, Constant))
     ]
+
+
+def get_regular_members(cls):
+    private_prefix = '_%s__' % cls.__name__
+    for name, obj in cls.__dict__.items():
+        if name.startswith('__') or name.startswith(private_prefix):
+            continue
+        yield name, obj
 
 
 __all__ = module_exports(__name__)

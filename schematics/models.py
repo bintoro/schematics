@@ -7,7 +7,7 @@ import inspect
 import itertools
 from types import FunctionType
 
-from .common import * # pylint: disable=redefined-builtin
+from .common import *
 from .datastructures import OrderedDict, Context
 from .exceptions import *
 from .transforms import (
@@ -18,7 +18,7 @@ from .validate import validate, prepare_validator
 from .types import BaseType
 from .types.serializable import Serializable
 from .undefined import Undefined
-from .util import get_ident
+from .util import get_ident, get_regular_members, merge_dicts
 
 
 class FieldDescriptor(object):
@@ -69,11 +69,9 @@ class ModelOptions(object):
     options for every class.
     """
 
-    def __init__(self, klass, namespace=None, roles=None, export_level=DEFAULT,
+    def __init__(self, namespace=None, roles=None, export_level=DEFAULT,
                  serialize_when_none=None, export_order=False):
         """
-        :param klass:
-            The class which this options instance belongs to.
         :param namespace:
             A namespace identifier that can be used with persistence layers.
         :param roles:
@@ -88,7 +86,6 @@ class ModelOptions(object):
             a regular dictionary.
             Default: ``False``
         """
-        self.klass = klass
         self.namespace = namespace
         self.roles = roles or {}
         self.export_level = export_level
@@ -181,30 +178,23 @@ class ModelMeta(type):
     @classmethod
     def _read_options(mcs, name, bases, attrs):
         """
-        Parses `ModelOptions` instance into the options value attached to
-        `Model` instances.
+        Collects ``Options`` values and stores them in a ``ModelOptions`` instance.
         """
+        options_class = attrs.get('__optionsclass__', ModelOptions)
         options_members = {}
+        mergeable_keys = ['roles']
 
         for base in reversed(bases):
-            if hasattr(base, "_options"):
-                for key, value in inspect.getmembers(base._options):
-                    if not key.startswith("_") and not key == "klass":
-                        options_members[key] = value
+            if isinstance(base, ModelMeta):
+                options_members.update(base._options.__dict__)
 
-        options_class = attrs.get('__optionsclass__', ModelOptions)
         if 'Options' in attrs:
-            for key, value in inspect.getmembers(attrs['Options']):
-                if not key.startswith("_"):
-                    if key == "roles":
-                        roles = options_members.get("roles", {}).copy()
-                        roles.update(value)
+            for key, value in get_regular_members(attrs['Options']):
+                if key in mergeable_keys:
+                    value = merge_dicts({}, options_members[key], value)
+                options_members[key] = value
 
-                        options_members["roles"] = roles
-                    else:
-                        options_members[key] = value
-
-        return options_class(mcs, **options_members)
+        return options_class(**options_members)
 
     @property
     def fields(cls):
