@@ -428,8 +428,8 @@ def test_model_validator_override():
         def validate_bar(self, data, value, context=None):
             pass
 
-    assert Child._validator_functions['foo'] is Base._validator_functions['foo']
-    assert Child._validator_functions['bar'] is not Base._validator_functions['bar']
+    assert Child._validators['foo'] is Base._validators['foo']
+    assert Child._validators['bar'] is not Base._validators['bar']
 
 
 def test_validate_convert():

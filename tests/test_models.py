@@ -8,7 +8,7 @@ from schematics.common import PY2
 from schematics.models import Model, ModelOptions
 from schematics.transforms import whitelist, blacklist
 from schematics.undefined import Undefined
-from schematics.types import StringType, IntType, ListType, ModelType
+from schematics.types import *
 from schematics.exceptions import *
 
 
@@ -695,4 +695,50 @@ def test_mock_recursive_model():
         m = ListType(ModelType('M', required=True), required=True)
 
     M.get_mock_object()
+
+
+def test_field_order():
+
+    class A(Model):
+        field2 = StringType()
+        field3 = StringType()
+        field5 = StringType()
+        field6 = StringType()
+        field7 = StringType()
+        field8 = StringType()
+
+    class B(A):
+        field1 = StringType()
+        field7 = StringType()
+        field4 = StringType()
+        field3 = StringType()
+        field0 = StringType()
+
+    assert list(B._fields.keys()) \
+        == ['field2', 'field3', 'field5', 'field6', 'field7', 'field8', 'field1', 'field4', 'field0']
+
+
+def test_field_with_reserved_name():
+
+    with pytest.raises(RuntimeError):
+        class M(Model):
+            validate = BooleanType()
+
+    class MyMixin(object):
+        _reserved_attrs = ['foo']
+
+    with pytest.raises(RuntimeError):
+        class C(Model, MyMixin):
+            foo = IntType()
+
+
+def test_field_with_configured_name():
+
+    class M(Model):
+        validate_ = BooleanType(name='validate')
+
+    assert list(M._fields.items()) == [('validate', M.validate_)]
+
+    m = M({'validate': True})
+    assert m.validate_ is m['validate'] is True
 

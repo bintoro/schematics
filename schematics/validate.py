@@ -76,10 +76,10 @@ def _validate_model(cls, data, context):
     errors = {}
     invalid_fields = []
     for field_name, field in iteritems(cls._fields):
-        if field_name in cls._validator_functions and field_name in data:
+        if field_name in cls._validators and field_name in data:
             value = data[field_name]
             try:
-                cls._validator_functions[field_name](cls, data, value, context)
+                cls._validators[field_name](cls, data, value, context)
             except FieldError as exc:
                 field = cls._fields[field_name]
                 serialized_field_name = field.serialized_name or field_name

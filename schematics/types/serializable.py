@@ -45,6 +45,9 @@ def serializable(arg=None, **kwargs):
     else:
         raise TypeError("The argument to 'serializable' must be a function or a type.")
 
+    if 'name' in kwargs:
+        raise TypeError("The 'name' option cannot be used with 'serializable'.")
+
     if isinstance(serialized_type, BaseType):
         # `serialized_type` is already a type instance,
         # so update it with the options found in `kwargs`.

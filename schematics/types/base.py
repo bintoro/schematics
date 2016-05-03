@@ -157,7 +157,7 @@ class BaseType(object):
         PRIMITIVE: 'to_primitive',
     }
 
-    def __init__(self, required=False, default=Undefined, serialized_name=None,
+    def __init__(self, name=None, required=False, default=Undefined, serialized_name=None,
                  choices=None, validators=None, deserialize_from=None,
                  export_level=None, serialize_when_none=None,
                  messages=None, metadata=None):
@@ -181,7 +181,8 @@ class BaseType(object):
         self.metadata = metadata or {}
         self._position_hint = next(_next_position_hint)  # For ordering of fields
 
-        self.name = None
+        self.name = name
+        self.attr = None
         self.owner_model = None
         self.parent_field = None
         self.typeclass = self.__class__

@@ -4,7 +4,7 @@ from __future__ import unicode_literals, absolute_import
 
 from copy import deepcopy
 import inspect
-import itertools
+from itertools import chain
 from types import FunctionType
 
 from .common import *
@@ -41,11 +41,10 @@ class FieldDescriptor(object):
         if instance is None:
             return cls._fields[self.name]
         else:
-            value = instance._data.get(self.name, Undefined)
-            if value is Undefined:
-                raise UndefinedValueError(instance, self.name)
+            if self.name in instance._data:
+                return instance._data[self.name]
             else:
-                return value
+                raise UndefinedValueError(instance, self.name)
 
     def __set__(self, instance, value):
         """
@@ -104,76 +103,109 @@ class ModelMeta(type):
     def __new__(mcs, name, bases, attrs):
         """
         This metaclass adds four attributes to host classes: mcs._fields,
-        mcs._serializables, mcs._validator_functions, and mcs._options.
+        mcs._serializables, mcs._validators, and mcs._options.
 
         This function creates those attributes like this:
 
         ``mcs._fields`` is list of fields that are Schematics types
         ``mcs._serializables`` is a list of ``Serializable`` objects
-        ``mcs._validator_functions`` are class-level validation functions
+        ``mcs._validators`` are class-level validation functions
         ``mcs._options`` is the end result of parsing the ``Options`` class
         """
-
-        # Structures used to accumulate meta info
+        # Containers for the full sets of objects
         fields = OrderedDict()
-        serializables = {}
-        validator_functions = {}  # Model level
+        serializables = OrderedDict()
+        validators = OrderedDict()
 
-        # Accumulate metas info from parent classes
+        # Containers for objects defined in the class namespace
+        ns_fields = OrderedDict()
+        ns_serializables = OrderedDict()
+        ns_validators = OrderedDict()
+
+        # Parse class attributes.
+        for key, obj in iteritems(attrs):
+
+            # Field
+            if isinstance(obj, BaseType):
+                obj.attr = key
+                ns_fields[obj.name or key] = obj
+
+            # Serializable
+            elif isinstance(obj, Serializable):
+                ns_serializables[key] = obj
+
+            # Validator
+            elif key.startswith('validate_') \
+              and isinstance(obj, (FunctionType, classmethod)):
+                ns_validators[key[9:]] = prepare_validator(obj, 4)
+
+        # Sort the fields.
+        for d in (ns_fields, ns_serializables):
+            d.sort(key=lambda i: i[1]._position_hint)
+
+        # Merge current and inherited objects.
         for base in reversed(bases):
-            if hasattr(base, '_fields'):
+            if isinstance(base, ModelMeta):
                 fields.update(deepcopy(base._fields))
-            if hasattr(base, '_serializables'):
                 serializables.update(deepcopy(base._serializables))
-            if hasattr(base, '_validator_functions'):
-                validator_functions.update(base._validator_functions)
+                validators.update(base._validators)
+        fields.update(ns_fields)
+        serializables.update(ns_serializables)
+        validators.update(ns_validators)
 
-        # Parse this class's attributes into meta structures
-        for key, value in iteritems(attrs):
-            if key.startswith('validate_') and isinstance(value, (FunctionType, classmethod)):
-                validator_functions[key[9:]] = prepare_validator(value, 4)
-            if isinstance(value, BaseType):
-                fields[key] = value
-            if isinstance(value, Serializable):
-                serializables[key] = value
-
-        # Parse meta options
+        # Parse options.
         options = mcs._read_options(name, bases, attrs)
 
-        # Convert list of types into fields for new klass
-        fields.sort(key=lambda i: i[1]._position_hint)
+        # Update class attributes.
         for key, field in iteritems(fields):
-            attrs[key] = FieldDescriptor(key)
-        for key, serializable in iteritems(serializables):
-            attrs[key] = serializable
+            attrs[field.attr] = FieldDescriptor(key)
+        for key, field in iteritems(serializables):
+            attrs[key] = field
 
-        # Ready meta data to be klass attributes
+        # Add meta-structures to class attributes.
         attrs['_fields'] = fields
         attrs['_field_list'] = list(fields.items())
         attrs['_serializables'] = serializables
-        attrs['_validator_functions'] = validator_functions
+        attrs['_validators'] = validators
         attrs['_options'] = options
 
-        klass = type.__new__(mcs, name, bases, attrs)
-        klass = str_compat(klass)
+        # Create the class.
+        cls = type.__new__(mcs, name, bases, attrs)
+        cls = str_compat(cls)
 
-        # Register class on ancestor models
-        klass._subclasses = []
-        for base in klass.__mro__[1:]:
+        # Check for attribute name conflicts.
+        attrs = dict((field.attr, field) for field in chain(fields.values(), serializables.values()))
+        for c in cls.__mro__[:-1]:
+            if '_reserved_attrs' in c.__dict__:
+                conflicts = set(c._reserved_attrs) & set(attrs)
+                try:
+                    field = attrs[conflicts.pop()]
+                    raise RuntimeError(
+                        ("'{0}' is a reserved attribute of {1}. Please choose another attribute name."
+                         + (" The field name can be set to '{0}' by configuring the type with"
+                            " the option \"name='{0}'\"." if isinstance(field, BaseType) else ""))
+                        .format(field.attr, c.__name__))
+                except KeyError:
+                    continue
+
+        # Register the class on ancestor models.
+        cls._subclasses = []
+        for base in cls.__mro__[1:]:
             if isinstance(base, ModelMeta):
-                base._subclasses.append(klass)
+                base._subclasses.append(cls)
 
-        # Finalize fields
+        # Finalize fields.
         for field_name, field in fields.items():
-            field._setup(field_name, klass)
+            field._setup(field_name, cls)
         for field_name, field in serializables.items():
-            field._setup(field_name, klass)
+            field._setup(field_name, cls)
 
-        klass._valid_input_keys = (
-            set(itertools.chain(*(field.get_input_keys() for field in fields.values())))
+        # Finalize the class.
+        cls._valid_input_keys = (
+            set(chain(*(field.get_input_keys() for field in fields.values())))
           | set(serializables))
 
-        return klass
+        return cls
 
     @classmethod
     def _read_options(mcs, name, bases, attrs):
@@ -222,6 +254,8 @@ class Model(object):
     """
 
     __optionsclass__ = ModelOptions
+
+    _reserved_attrs = ['convert', 'export', 'validate', 'import_data', 'atoms', 'keys', 'get']
 
     def __init__(self, raw_data=None, trusted_data=None, deserialize_mapping=None,
                  init=True, partial=True, strict=True, validate=False, app_data=None,
@@ -315,8 +349,13 @@ class Model(object):
     def values(self):
         return [self._data[k] for k in self]
 
-    def get(self, key, default=None):
-        return getattr(self, key, default)
+    def get(self, name, default=None):
+        if name in self._data:
+            return self._data[name]
+        elif name in self._serializables:
+            return getattr(self, name, default)
+        else:
+            return default
 
     @classmethod
     def get_mock_object(cls, context=None, overrides={}):
@@ -343,20 +382,24 @@ class Model(object):
         return cls(values)
 
     def __getitem__(self, name):
-        if name in self._fields or name in self._serializables:
+        if name in self._data:
+            return self._data[name]
+        elif name in self._fields:
+            raise UndefinedValueError(self, name)
+        elif name in self._serializables:
             return getattr(self, name)
         else:
             raise UnknownFieldError(self, name)
 
     def __setitem__(self, name, value):
         if name in self._fields:
-            return setattr(self, name, value)
+            self._data[name] = value
         else:
             raise UnknownFieldError(self, name)
 
     def __delitem__(self, name):
         if name in self._fields:
-            return delattr(self, name)
+            del self._data[name]
         else:
             raise UnknownFieldError(self, name)
 
