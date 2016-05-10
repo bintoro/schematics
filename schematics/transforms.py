@@ -464,12 +464,12 @@ class BasicConverter(Converter):
 
 
 @BasicConverter
-def to_native_converter(field, value, context):
+def native_exporter(field, value, context):
     return field.export(value, NATIVE, context)
 
 
 @BasicConverter
-def to_primitive_converter(field, value, context):
+def primitive_exporter(field, value, context):
     return field.export(value, PRIMITIVE, context)
 
 
@@ -479,20 +479,19 @@ def to_primitive_converter(field, value, context):
 ###
 
 
-@BasicConverter
-def import_converter(field, value, context):
-    field.check_required(value, context)
-    if value is None or value is Undefined:
-        return value
-    return field.convert(value, context)
+class ImportConverter(Converter):
+
+    def __call__(self, field, value, context):
+        field.check_required(value, context)
+        if value is None or value is Undefined:
+            return value
+        if context.validate:
+            return field.validate(value, context)
+        else:
+            return field.convert(value, context)
 
 
-@BasicConverter
-def validation_converter(field, value, context):
-    field.check_required(value, context)
-    if value is None or value is Undefined:
-        return value
-    return field.validate(value, context)
+standard_importer = ImportConverter()
 
 
 
@@ -501,7 +500,7 @@ def validation_converter(field, value, context):
 ###
 
 
-def get_import_context(field_converter=import_converter, **options):
+def get_import_context(field_converter=standard_importer, **options):
     import_options = {
         'field_converter': field_converter,
         'partial': False,
@@ -515,7 +514,7 @@ def get_import_context(field_converter=import_converter, **options):
     return Context(**import_options)
 
 
-def get_export_context(field_converter=to_native_converter, **options):
+def get_export_context(field_converter, **options):
     export_options = {
         'field_converter': field_converter,
         'export_level': None
@@ -530,16 +529,20 @@ def get_export_context(field_converter=to_native_converter, **options):
 ###
 
 
-def convert(cls, instance_or_dict, **kwargs):
-    return import_loop(cls, instance_or_dict, import_converter, **kwargs)
+def convert(cls, instance_or_dict, field_converter=standard_importer, **kwargs):
+    return import_loop(cls, instance_or_dict, field_converter, **kwargs)
+
+
+def export(cls, instance_or_dict, field_converter, **kwargs):
+    return export_loop(cls, instance_or_dict, field_converter, **kwargs)
 
 
 def to_native(cls, instance_or_dict, **kwargs):
-    return export_loop(cls, instance_or_dict, to_native_converter, **kwargs)
+    return export_loop(cls, instance_or_dict, native_exporter, **kwargs)
 
 
 def to_primitive(cls, instance_or_dict, **kwargs):
-    return export_loop(cls, instance_or_dict, to_primitive_converter, **kwargs)
+    return export_loop(cls, instance_or_dict, primitive_exporter, **kwargs)
 
 
 

@@ -8,12 +8,12 @@ import inspect
 from .common import * # pylint: disable=redefined-builtin
 from .datastructures import Context
 from .exceptions import FieldError, DataError
-from .transforms import import_loop, validation_converter
+from .transforms import import_loop, get_import_context
 from .undefined import Undefined
 
 
 def validate(cls, instance_or_dict, trusted_data=None, partial=False, strict=False,
-             convert=True, context=None, **kwargs):
+             convert=True, oo=False, context=None, **kwargs):
     """
     Validate some untrusted data using a model. Trusted data can be passed in
     the `trusted_data` parameter.
@@ -42,7 +42,7 @@ def validate(cls, instance_or_dict, trusted_data=None, partial=False, strict=Fal
         If errors are found, they are raised as a ValidationError with a list
         of errors attached.
     """
-    context = context or get_validation_context(partial=partial, strict=strict, convert=convert)
+    context = context or get_validation_context(partial=partial, strict=strict, convert=convert, oo=oo)
 
     errors = {}
     try:
@@ -93,16 +93,7 @@ def _validate_model(cls, data, context):
 
 
 def get_validation_context(**options):
-    validation_options = {
-        'field_converter': validation_converter,
-        'partial': False,
-        'strict': False,
-        'convert': True,
-        'validate': True,
-        'new': False,
-    }
-    validation_options.update(options)
-    return Context(**validation_options)
+    return get_import_context(validate=True, **options)
 
 
 def prepare_validator(func, argcount):

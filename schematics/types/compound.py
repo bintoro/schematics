@@ -12,7 +12,7 @@ from ..exceptions import *
 from ..transforms import (
     export_loop,
     get_import_context, get_export_context,
-    to_native_converter, to_primitive_converter)
+    native_exporter, primitive_exporter)
 
 from .base import BaseType, get_value_in
 
@@ -40,20 +40,20 @@ class CompoundType(BaseType):
     def _convert(self, value, context):
         raise NotImplementedError
 
-    def export(self, value, format, context=None):
-        context = context or get_export_context()
+    def export(self, value, format, context=None, field_converter=native_exporter):
+        context = context or get_export_context(field_converter)
         return self._export(value, format, context)
 
     def _export(self, value, format, context):
         raise NotImplementedError
 
     def to_native(self, value, context=None):
-        context = context or get_export_context(to_native_converter)
-        return to_native_converter(self, value, context)
+        context = context or get_export_context(native_exporter)
+        return native_exporter(self, value, context)
 
     def to_primitive(self, value, context=None):
-        context = context or get_export_context(to_primitive_converter)
-        return to_primitive_converter(self, value, context)
+        context = context or get_export_context(primitive_exporter)
+        return primitive_exporter(self, value, context)
 
     def _init_field(self, field, options):
         """
