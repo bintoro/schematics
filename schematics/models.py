@@ -417,6 +417,19 @@ class Model(object):
         """
         return None
 
+    def __copy__(self):
+        cls = self.__class__
+        obj = cls.__new__(cls)
+        obj.__dict__ = self.__dict__.copy()
+        obj._data = self._data.copy()
+        return obj
+
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        obj = cls.__new__(cls)
+        obj.__dict__ = deepcopy(self.__dict__, memo)
+        return obj
+
 
 __all__ = module_exports(__name__)
 

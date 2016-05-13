@@ -219,14 +219,15 @@ def test_conversion_with_validation(input, import_, two_pass, input_instance, in
             input.validate(init_values=init, partial=partial)
             m = input
 
-        assert input == orig_input
 
         if input_instance:
             if import_:
+                assert input == orig_input
                 assert m.modelfield is not input.modelfield
                 assert m._data['modelfield'] is not input._data['modelfield']
                 assert m.modelfield.listfield is not input.modelfield.listfield
             else:
+                assert input != orig_input
                 assert m.modelfield is input.modelfield
                 assert m._data['modelfield'] is input._data['modelfield']
                 assert m.modelfield.listfield is input.modelfield.listfield

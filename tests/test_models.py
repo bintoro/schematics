@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from copy import copy, deepcopy
+
 import pytest
 
 from schematics.common import PY2
@@ -649,6 +651,43 @@ def test_repr():
         assert repr(inst) == '<FooModel: \\xe9, \\xc4>'
     else:
         assert repr(inst) == '<FooModel: é, Ä>'
+
+
+def test_copy():
+    class M(Model):
+        intfield = IntType()
+        listfield = ListType(IntType)
+
+    inst1 = M({'intfield': 1, 'listfield': [1]})
+    inst1.x = 99
+    inst2 = copy(inst1)
+
+    assert inst1.__dict__ == inst2.__dict__
+    assert inst1._data is not inst2._data
+    assert inst1.listfield is inst2.listfield
+
+    inst2.intfield = 2
+    inst2.listfield.append(2)
+    assert inst1.intfield == 1
+    assert inst1.listfield == [1, 2]
+
+
+def test_deepcopy():
+    class M(Model):
+        intfield = IntType()
+        listfield = ListType(IntType)
+
+    inst1 = M({'intfield': 1, 'listfield': [1]})
+    inst2 = deepcopy(inst1)
+
+    assert inst1.__dict__ == inst2.__dict__
+    assert inst1._data is not inst2._data
+    assert inst1.listfield is not inst2.listfield
+
+    inst2.intfield = 2
+    inst2.listfield.append(2)
+    assert inst1.intfield == 1
+    assert inst1.listfield == [1]
 
 
 def test_mock_recursive_model():
