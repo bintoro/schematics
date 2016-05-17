@@ -98,7 +98,8 @@ def test_complex_import_data(recursive, preconvert_source, populate_source, popu
             'matrixfield': [[9]],
             'modelfield': {
                 'intfield': '103',
-                'dictfield': dict(c=33)}}}
+                'dictfield': dict(c=33),
+                'modelfield': {}}}}
 
     sourcedata = deepcopy(sourcedict)
 
@@ -121,7 +122,8 @@ def test_complex_import_data(recursive, preconvert_source, populate_source, popu
                 'dictfield': dict(a=11, b=22),
                 'modelfield': {
                     'intfield': '103',
-                    'dictfield': dict(c=33)}}}, init=populated_result)
+                    'dictfield': dict(c=33),
+                    'modelfield': {}}}}, init=populated_result)
     else:
         assert m == M(sourcedict, init=populated_result)
 

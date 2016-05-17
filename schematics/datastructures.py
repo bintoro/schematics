@@ -295,7 +295,7 @@ class Context(DataObject):
     def _branch(self, **kwargs):
         if not kwargs:
             return self
-        items = dict(((k, v) for k, v in kwargs.items() if v is not None and v != self[k]))
+        items = dict(((k, v) for k, v in kwargs.items() if v != self[k]))
         if items:
             return self.__class__(self, **items)
         else:

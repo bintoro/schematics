@@ -120,7 +120,7 @@ def test_context():
     assert d is c
 
     d = c._branch(x=None)
-    assert d is c
+    assert d is not c
 
     d = c._branch(x=0)
     assert d is not c

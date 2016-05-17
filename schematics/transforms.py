@@ -96,7 +96,7 @@ def import_loop(cls, instance_or_dict, field_converter=None, trusted_data=None,
     _field_converter = context.field_converter
     _model_mapping = context.mapping.get('model_mapping')
 
-    data = dict(context.trusted_data) if context.trusted_data else {}
+    data = dict(context.trusted_data)
     errors = {}
 
     if got_data:
@@ -136,11 +136,11 @@ def import_loop(cls, instance_or_dict, field_converter=None, trusted_data=None,
         if got_data:
             if field.is_compound:
                 if context.trusted_data and context.recursive:
-                    td = context.trusted_data.get(field_name)
+                    td = context.trusted_data.get(field_name) or {}
                 else:
                     td = {}
                 if _model_mapping:
-                    submap = _model_mapping.get(field_name)
+                    submap = _model_mapping.get(field_name, {})
                 else:
                     submap = {}
                 field_context = context._branch(trusted_data=td, mapping=submap)
