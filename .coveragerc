@@ -5,4 +5,6 @@ exclude_lines =
     def __repr__
     raise AssertionError
     raise NotImplementedError
+    if PY2:
+    except ImportError
 
