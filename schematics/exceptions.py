@@ -160,7 +160,9 @@ ModelValidationError = DataError # v1
 
 class MockCreationError(ValueError):
     """Exception raised when a mock value cannot be generated."""
-    pass
+    def __init__(self, message):
+        self.message = message
+        super(MockCreationError, self).__init__(message)
 
 
 class UndefinedValueError(AttributeError, KeyError):

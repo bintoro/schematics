@@ -347,7 +347,8 @@ class Model(object):
             try:
                 values[name] = field.mock(context)
             except MockCreationError as exc:
-                raise MockCreationError('%s: %s' % (name, exc.message))
+                exc.__init__('%s.%s: %s' % (cls.__name__, name, exc.message))
+                raise
         values.update(overrides)
         return cls(values)
 

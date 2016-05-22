@@ -2,6 +2,8 @@
 
 import pytest
 
+from schematics.models import Model
+from schematics.types import BaseType
 from schematics.exceptions import *
 
 
@@ -116,4 +118,19 @@ def test_error_failures():
 
     with pytest.raises(TypeError):
         CompoundError(['hello'])
+
+
+def test_mock_error():
+
+    class FooType(BaseType):
+        def _mock(self, context):
+            raise MockCreationError('blah')
+
+    class M(Model):
+        foo = FooType(required=True)
+
+    with pytest.raises(MockCreationError) as excinfo:
+        M.get_mock_object()
+
+    assert excinfo.value.message == 'M.foo: blah'
 
