@@ -66,6 +66,10 @@ def test_validate_with_instance_level_validators():
     class Player(Model):
         id = IntType()
 
+        def __init__(self, data=None, *args, **kwargs):
+            self._initial = data
+            Model.__init__(self, data, *args, **kwargs)
+
         def validate_id(self, data, value, context):
             if p1._initial['id'] != value:
                 p1._data['id'] = p1._initial['id']

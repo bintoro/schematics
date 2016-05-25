@@ -93,6 +93,26 @@ def test_raises_validation_error_on_init_with_partial_submodel():
         c.validate()
 
 
+def test_dict_handling():
+    class User(Model):
+        name = StringType(required=True)
+        age = IntType(required=True)
+
+    class Card(Model):
+        user = ModelType(User)
+
+    c = Card()
+    c['user'] = {'name': 'Arthur', 'age': 23}
+    assert type(c.user) is dict
+    c.validate()
+    assert type(c.user) is User
+
+    c = Card()
+    c['user'] = {'name': 'Arthur', 'age': 23}
+    c.validate(convert=False)
+    assert type(c.user) is dict
+
+
 def test_model_type():
     class User(Model):
         name = StringType()

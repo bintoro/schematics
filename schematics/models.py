@@ -11,10 +11,11 @@ from .common import *
 from .datastructures import OrderedDict, Context
 from .exceptions import *
 from .transforms import (
-    atoms, export_loop,
-    convert, to_native, to_primitive,
+    atoms,
+    import_loop, get_import_context,
+    export_loop, get_export_context, native_exporter, primitive_exporter
 )
-from .validate import validate, prepare_validator
+from .validate import validate, prepare_validator, get_validation_context
 from .types import BaseType
 from .types.serializable import Serializable
 from .undefined import Undefined
@@ -255,23 +256,32 @@ class Model(object):
 
     __optionsclass__ = ModelOptions
 
-    _reserved_attrs = ['convert', 'export', 'validate', 'import_data', 'atoms', 'keys', 'get']
+    _reserved_attrs = ['validate', 'import_data', 'export', 'atoms', 'keys', 'get']
 
-    def __init__(self, raw_data=None, trusted_data=None, deserialize_mapping=None,
-                 init=True, partial=True, strict=True, validate=False, app_data=None,
-                 **kwargs):
+    def __new__(cls, *args, **kwargs):
+        instance = object.__new__(cls)
+        instance._data = {}
+        return instance
 
-        self._initial = raw_data or {}
+    def __init__(self,
+                 raw_data=None, mapping=None, deserialize_mapping=None,
+                 trusted_data=None,
+                 partial=True, strict=True,
+                 init_values=None, apply_defaults=None, init=True,
+                 validate=False,
+                 app_data=None, context=None):
 
-        kwargs.setdefault('init_values', init)
-        kwargs.setdefault('apply_defaults', init)
+        mapping = mapping or deserialize_mapping # v1
 
-        self._data = self.convert(raw_data,
-                                  trusted_data=trusted_data, mapping=deserialize_mapping,
-                                  partial=partial, strict=strict, validate=validate, new=True,
-                                  app_data=app_data, **kwargs)
+        context = get_import_context(new=True, **locals())
+        self._import(raw_data, context)
 
-    def validate(self, partial=False, convert=True, app_data=None, **kwargs):
+    def validate(self,
+                 trusted_data=None,
+                 partial=False, strict=False,
+                 init_values=None, apply_defaults=None,
+                 convert=True,
+                 app_data=None, context=None):
         """
         Validates the state of the model. If the data is invalid, raises a ``DataError``
         with error messages.
@@ -285,49 +295,52 @@ class Model(object):
             are known to have the right datatypes (e.g., when validating immediately
             after the initial import). Default: True
         """
-        data = self.convert(self, validate=True, partial=partial, convert=convert,
-                            app_data=app_data, **kwargs)
+        context = get_validation_context(**locals())
+        self._import(self, context)
+        return self
 
-        if convert:
-            self._data.update(**data)
-
-    def import_data(self, raw_data, recursive=False, **kwargs):
+    def import_data(self,
+                    raw_data, mapping=None,
+                    partial=True, strict=True,
+                    init_values=None, apply_defaults=None,
+                    validate=False, recursive=False,
+                    app_data=None, context=None):
         """
         Converts and imports the raw data into an existing model instance.
 
         :param raw_data:
             The data to be imported.
         """
-        self._data = self.convert(raw_data, trusted_data=self, recursive=recursive, **kwargs)
+        context = get_import_context(trusted_data=self, new=True, **locals())
+        self._import(raw_data, context)
         return self
 
-    @classmethod
-    def convert(cls, raw_data, context=None, **kw):
-        """
-        Converts the raw data into richer Python constructs according to the
-        fields on the model
+    def _import(self, raw_data, context):
+        if not context.initialized:
+            context.oo = True
+        self._data = import_loop(self.__class__, raw_data, context)
+        return self
 
-        :param raw_data:
-            The data to be converted
-        """
-        _validate = getattr(context, 'validate', None) or kw.get('validate', False)
-        if _validate:
-            return validate(cls, raw_data, oo=True, context=context, **kw)
-        else:
-            return convert(cls, raw_data, oo=True, context=context, **kw)
+    def export(self, field_converter, role=None, raise_error_on_role=True,
+               export_level=None, app_data=None, context=None):
+        context = get_export_context(**locals())
+        return self._export(context)
 
-    def export(self, field_converter=None, role=None, app_data=None, **kwargs):
-        return export_loop(self.__class__, self, field_converter=field_converter,
-                           role=role, app_data=app_data, **kwargs)
+    def to_native(self, role=None, raise_error_on_role=True,
+                  export_level=None, app_data=None, context=None):
+        context = get_export_context(native_exporter, **locals())
+        return self._export(context)
 
-    def to_native(self, role=None, app_data=None, **kwargs):
-        return to_native(self.__class__, self, role=role, app_data=app_data, **kwargs)
-
-    def to_primitive(self, role=None, app_data=None, **kwargs):
-        return to_primitive(self.__class__, self, role=role, app_data=app_data, **kwargs)
+    def to_primitive(self, role=None, raise_error_on_role=True,
+                     export_level=None, app_data=None, context=None):
+        context = get_export_context(primitive_exporter, **locals())
+        return self._export(context)
 
     def serialize(self, *args, **kwargs):
         return self.to_primitive(*args, **kwargs)
+
+    def _export(self, context):
+        return export_loop(self.__class__, self, context)
 
     def atoms(self):
         """

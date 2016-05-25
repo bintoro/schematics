@@ -15,7 +15,7 @@ from schematics.undefined import Undefined
 def test_import_data(init):
 
     class M(Model):
-        a, b, c, d = IntType(), IntType(), IntType(), IntType()
+        a, b, c, d = IntType(), IntType(), IntType(required=True), IntType()
 
     m = M({
         'a': 1,
@@ -26,7 +26,7 @@ def test_import_data(init):
     m.import_data({
         'a': None,
         'b': 2
-    })
+    }, partial=False)
 
     if init:
         assert m._data == {'a': None, 'b': 2, 'c': 3, 'd': None}
@@ -48,10 +48,9 @@ def test_import_data_with_error(init):
 
     with pytest.raises(DataError):
         m.import_data({
-            'a': None,
             'b': 2,
             'c': None,
-        })
+        }, partial=False)
 
     if init:
         assert m._data == {'a': 1, 'b': None, 'c': 3, 'd': None}

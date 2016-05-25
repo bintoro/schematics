@@ -5,15 +5,18 @@ from __future__ import unicode_literals, absolute_import
 import functools
 import inspect
 
-from .common import * # pylint: disable=redefined-builtin
+from .common import *
 from .datastructures import Context
 from .exceptions import FieldError, DataError
 from .transforms import import_loop, get_import_context
 from .undefined import Undefined
 
 
+__all__ = ['validate']
+
+
 def validate(cls, instance_or_dict, trusted_data=None, partial=False, strict=False,
-             convert=True, oo=False, context=None, **kwargs):
+             convert=True, validate=True, oo=False, app_data=None, context=None):
     """
     Validate some untrusted data using a model. Trusted data can be passed in
     the `trusted_data` parameter.
@@ -42,25 +45,11 @@ def validate(cls, instance_or_dict, trusted_data=None, partial=False, strict=Fal
         If errors are found, they are raised as a ValidationError with a list
         of errors attached.
     """
-    context = context or get_validation_context(partial=partial, strict=strict, convert=convert, oo=oo)
-
-    errors = {}
-    try:
-        data = import_loop(cls, instance_or_dict, trusted_data=trusted_data,
-                           context=context, **kwargs)
-    except DataError as exc:
-        errors = exc.messages
-        data = exc.partial_data
-
-    errors.update(_validate_model(cls, data, context))
-
-    if errors:
-        raise DataError(errors, data)
-
-    return data
+    context = context or get_validation_context(**locals())
+    return import_loop(cls, instance_or_dict, context)
 
 
-def _validate_model(cls, data, context):
+def validate_model(cls, data, context):
     """
     Validate data using model level methods.
 
@@ -93,7 +82,8 @@ def _validate_model(cls, data, context):
 
 
 def get_validation_context(**options):
-    return get_import_context(validate=True, **options)
+    options['validate'] = True
+    return get_import_context(**options)
 
 
 def prepare_validator(func, argcount):
@@ -107,7 +97,4 @@ def prepare_validator(func, argcount):
             return func(*args, **kwargs)
         return newfunc
     return func
-
-
-__all__ = module_exports(__name__)
 

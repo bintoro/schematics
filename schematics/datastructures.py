@@ -266,9 +266,10 @@ class Context(DataObject):
     _fields = ()
 
     def __init__(self, *args, **kwargs):
+        self.__dict__['initialized'] = False
         super(Context, self).__init__(*args, **kwargs)
         if self._fields:
-            unknowns = [name for name in self._keys() if name not in self._fields]
+            unknowns = [name for name in self._keys() if name not in self._fields + ('initialized',)]
             if unknowns:
                 raise ValueError('Unexpected field names: %r' % unknowns)
 
@@ -287,8 +288,17 @@ class Context(DataObject):
         else:
             return cls(obj)
 
+    @property
+    def _dict(self):
+        d = self.__dict__.copy()
+        del d['initialized']
+        return d
+
+    def _seal(self):
+        self.__dict__['initialized'] = True
+
     def __setattr__(self, name, value):
-        if name in self:
+        if self.initialized and name in self:
             raise TypeError("Field '{0}' already set".format(name))
         super(Context, self).__setattr__(name, value)
 
@@ -301,18 +311,26 @@ class Context(DataObject):
         else:
             return self
 
+    def _setdefault(self, name, value):
+        if self._get(name) is None:
+            self[name] = value
+
     def _setdefaults(self, source):
         if not isinstance(source, dict):
             source = source.__dict__
-        new_values = source.copy()
-        new_values.update(self.__dict__)
-        self.__dict__.update(new_values)
+        self.__dict__.update((k, v) for k, v in source.items() if self.__dict__.get(k) is None)
         return self
 
     def __bool__(self):
         return True
 
     __nonzero__ = __bool__
+
+    def __len__(self):
+        return len(self.__dict__) - 1
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(%s)' % repr(self._dict)
 
 
 

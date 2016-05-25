@@ -2,15 +2,13 @@
 
 from __future__ import unicode_literals, absolute_import
 
-import collections
 from collections import Iterable, Sequence, Mapping
 import itertools
 
-from ..common import * # pylint: disable=redefined-builtin
-from ..datastructures import OrderedDict
+from ..common import *
 from ..exceptions import *
 from ..transforms import (
-    export_loop,
+    import_loop, export_loop,
     get_import_context, get_export_context,
     native_exporter, primitive_exporter)
 
@@ -118,22 +116,28 @@ class ModelType(CompoundType):
 
         if isinstance(value, self.model_class):
             model_class = type(value)
-        elif isinstance(value, dict):
+            is_instance = True
+        elif isinstance(value, Mapping):
             model_class = self.model_class
+            is_instance = False
         else:
             raise ConversionError(
                 "Input must be a mapping or '%s' instance" % self.model_class.__name__)
-        if context.convert and context.oo:
-            return model_class(value, context=context)
+        if context.oo:
+            if context.new or not is_instance:
+                instance = model_class.__new__(model_class)
+            else:
+                instance = value
+            return instance._import(value, context)
         else:
-            return model_class.convert(value, context=context)
+            return import_loop(model_class, value, context=context)
 
-    def _export(self, value, format, context):
-        if isinstance(value, Model):
-            model_class = type(value)
+    def _export(self, instance_or_dict, format, context):
+        if isinstance(instance_or_dict, Model):
+            return instance_or_dict._export(context)
         else:
             model_class = self.model_class
-        return export_loop(model_class, value, context=context)
+            return export_loop(model_class, instance_or_dict, context)
 
 
 class ListType(CompoundType):
@@ -392,7 +396,7 @@ class PolyModelType(CompoundType):
         if not self.is_allowed_model(model_instance):
             raise Exception("Cannot export: {} is not an allowed type".format(model_class))
 
-        return model_instance.export(context=context)
+        return model_instance._export(context)
 
 
 __all__ = module_exports(__name__)

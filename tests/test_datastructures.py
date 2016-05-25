@@ -99,19 +99,24 @@ def test_context():
     assert bool(FooContext()) is True
 
     c = FooContext(x=1, y=2)
-    assert c.__dict__ == dict(x=1, y=2)
+    assert c._dict == dict(x=1, y=2)
 
     with pytest.raises(ValueError):
         FooContext(a=1)
 
+    assert c.initialized is False
+    c.x = 1
+    c._seal()
     with pytest.raises(Exception):
         c.x = 0
 
     c.z = 3
-    assert c.__dict__ == dict(x=1, y=2, z=3)
+    assert c._dict == dict(x=1, y=2, z=3)
+
+    assert len(c) == 3
 
     c = FooContext._new(1, 2, 3)
-    assert c.__dict__ == dict(x=1, y=2, z=3)
+    assert c._dict == dict(x=1, y=2, z=3)
 
     with pytest.raises(TypeError):
         FooContext._new(1, 2, 3, 4)
@@ -122,18 +127,20 @@ def test_context():
     d = c._branch(x=None)
     assert d is not c
 
+    c._seal()
     d = c._branch(x=0)
     assert d is not c
-    assert d.__dict__ == dict(x=0, y=2, z=3)
+    assert d._dict == dict(x=0, y=2, z=3)
+    assert d.initialized is True
 
     e = d._branch(x=0)
     assert e is d
 
     c = FooContext(x=1, y=2)
     c._setdefaults(dict(x=9, z=9))
-    assert c.__dict__ == dict(x=1, y=2, z=9)
+    assert c._dict == dict(x=1, y=2, z=9)
 
     c = FooContext(x=1, y=2)
     c._setdefaults(FooContext(x=9, z=9))
-    assert c.__dict__ == dict(x=1, y=2, z=9)
+    assert c._dict == dict(x=1, y=2, z=9)
 

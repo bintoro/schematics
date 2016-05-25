@@ -6,7 +6,7 @@ from schematics.models import Model
 from schematics.types import StringType, LongType, IntType, MD5Type
 from schematics.types.compound import ModelType, DictType, ListType
 from schematics.types.serializable import serializable
-from schematics.transforms import blacklist, whitelist, wholelist, export_loop
+from schematics.transforms import blacklist, whitelist, wholelist, export
 
 
 def test_serializable():
@@ -506,7 +506,7 @@ def test_serialize_none_fields_if_field_says_so():
 
     q = TestModel({'inst_id': 1})
 
-    d = export_loop(TestModel, q, lambda field, value, context: None)
+    d = export(TestModel, q, lambda field, value, context: None)
     assert d == {'inst_id': None}
 
 
@@ -516,7 +516,7 @@ def test_serialize_none_fields_if_export_loop_says_so():
 
     q = TestModel({'inst_id': 1})
 
-    d = export_loop(TestModel, q, lambda field, value, context: None, export_level=DEFAULT)
+    d = export(TestModel, q, lambda field, value, context: None, export_level=DEFAULT)
     assert d == {'inst_id': None}
 
 
@@ -526,7 +526,7 @@ def test_serialize_print_none_always_gets_you_something():
 
     q = TestModel()
 
-    d = export_loop(TestModel, q, lambda field, value, context: None, export_level=DEFAULT)
+    d = export(TestModel, q, lambda field, value, context: None, export_level=DEFAULT)
     assert d == {}
 
 

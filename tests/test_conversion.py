@@ -115,10 +115,10 @@ def test_conversion(input, input_instance, input_init, init):
     assert type(m.modelfield.modelfield.intfield) is int
     assert type(m.modelfield.modelfield.matrixfield[2][3]) is int
     assert type(m.listfield) is list
+    assert type(m.modelfield.listfield) is list
     assert type(m.modelfield) is M
     assert type(m.modelfield.modelfield) is M
     assert type(m.modelfield.modelfield.modelfield) is M
-    assert type(m.modelfield.listfield) is list
     assert type(m.modelfield.modelfield.matrixfield) is list
     assert type(m.modelfield.modelfield.matrixfield[2]) is list
 
@@ -131,7 +131,6 @@ def test_conversion(input, input_instance, input_init, init):
 
     if input_instance:
         assert m.modelfield is not input.modelfield
-        assert m._data['modelfield'] is not input._data['modelfield']
         assert m.modelfield.listfield is not input.modelfield.listfield
     else:
         assert m.modelfield.listfield is not input['modelfield']['listfield']
@@ -158,10 +157,10 @@ def test_conversion_to_dictl(input, input_instance, input_init, init):
     assert type(m['modelfield']['modelfield']['intfield']) is int
     assert type(m['modelfield']['modelfield']['matrixfield'][2][3]) is int
     assert type(m['listfield']) is list
+    assert type(m['modelfield']['listfield']) is list
     assert type(m['modelfield']) is dict
     assert type(m['modelfield']['modelfield']) is dict
     assert type(m['modelfield']['modelfield']['modelfield']) is dict
-    assert type(m['modelfield']['listfield']) is list
     assert type(m['modelfield']['modelfield']['matrixfield']) is list
     assert type(m['modelfield']['modelfield']['matrixfield'][2]) is list
 
@@ -206,31 +205,22 @@ def test_conversion_with_validation(input, import_, two_pass, input_instance, in
 
         orig_input = copy(input)
 
-        if input_instance:
-            assert input.modelfield is orig_input.modelfield
-
         if import_:
             if two_pass:
                 m = M(input, init=init)
                 m.validate(partial=partial)
             else:
                 m = M(input, init=init, partial=partial, validate=True)
+            assert input == orig_input
+            if input_instance:
+                assert input.modelfield is orig_input.modelfield
+                assert m.modelfield != input.modelfield
+                assert m.modelfield.listfield == input.modelfield.listfield
+                assert m.modelfield.listfield is not input.modelfield.listfield
         else:
             input.validate(init_values=init, partial=partial)
-            m = input
-
-
-        if input_instance:
-            if import_:
-                assert input == orig_input
-                assert m.modelfield is not input.modelfield
-                assert m._data['modelfield'] is not input._data['modelfield']
-                assert m.modelfield.listfield is not input.modelfield.listfield
-            else:
-                assert input != orig_input
-                assert m.modelfield is input.modelfield
-                assert m._data['modelfield'] is input._data['modelfield']
-                assert m.modelfield.listfield is input.modelfield.listfield
+            assert input != orig_input
+            assert input.modelfield is orig_input.modelfield
 
         return
 

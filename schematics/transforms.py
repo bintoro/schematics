@@ -25,10 +25,7 @@ except ImportError:
 ###
 
 
-def import_loop(cls, instance_or_dict, field_converter=None, trusted_data=None,
-                mapping=None, partial=False, strict=False, init_values=False,
-                apply_defaults=False, convert=True, validate=False, new=False,
-                oo=False, recursive=False, app_data=None, context=None):
+def import_loop(cls, instance_or_dict, context):
     """
     The import loop is designed to take untrusted data and convert it into the
     native types, as described in ``cls``.  It does this by calling
@@ -60,6 +57,8 @@ def import_loop(cls, instance_or_dict, field_converter=None, trusted_data=None,
         The context object is created upon the initial invocation of ``import_loop``
         and is then propagated through the entire process.
     """
+    context._seal()
+
     if instance_or_dict is None:
         got_data = False
     else:
@@ -67,29 +66,6 @@ def import_loop(cls, instance_or_dict, field_converter=None, trusted_data=None,
 
     if got_data and not isinstance(instance_or_dict, (cls, dict)):
         raise ConversionError('Model conversion requires a model or dict')
-
-    context = Context._make(context)
-    try:
-        context.initialized
-    except:
-        if type(field_converter) is types.FunctionType:
-            field_converter = BasicConverter(field_converter)
-        context._setdefaults({
-            'initialized': True,
-            'field_converter': field_converter,
-            'trusted_data': trusted_data or {},
-            'mapping': mapping or {},
-            'partial': partial,
-            'strict': strict,
-            'init_values': init_values,
-            'apply_defaults': apply_defaults,
-            'convert': convert,
-            'validate': validate,
-            'new': new,
-            'oo': oo,
-            'recursive': recursive,
-            'app_data': app_data if app_data is not None else {}
-        })
 
     instance_or_dict = context.field_converter.pre(cls, instance_or_dict, context)
 
@@ -159,6 +135,9 @@ def import_loop(cls, instance_or_dict, field_converter=None, trusted_data=None,
 
         data[field_name] = value
 
+    if context.validate:
+        errors.update(validate_model(cls, data, context))
+
     if errors:
         raise DataError(errors, data)
 
@@ -167,8 +146,7 @@ def import_loop(cls, instance_or_dict, field_converter=None, trusted_data=None,
     return data
 
 
-def export_loop(cls, instance_or_dict, field_converter=None, role=None, raise_error_on_role=True,
-                export_level=None, app_data=None, context=None):
+def export_loop(cls, instance_or_dict, context):
     """
     The export_loop function is intended to be a general loop definition that
     can be used for any form of data shaping, such as application of roles or
@@ -196,20 +174,7 @@ def export_loop(cls, instance_or_dict, field_converter=None, role=None, raise_er
         The context object is created upon the initial invocation of ``import_loop``
         and is then propagated through the entire process.
     """
-    context = Context._make(context)
-    try:
-        context.initialized
-    except:
-        if type(field_converter) is types.FunctionType:
-            field_converter = BasicConverter(field_converter)
-        context._setdefaults({
-            'initialized': True,
-            'field_converter': field_converter,
-            'role': role,
-            'raise_error_on_role': raise_error_on_role,
-            'export_level': export_level,
-            'app_data': app_data if app_data is not None else {}
-        })
+    context._seal()
 
     instance_or_dict = context.field_converter.pre(cls, instance_or_dict, context)
 
@@ -496,31 +461,59 @@ standard_importer = ImportConverter()
 
 
 ###
-# Context stub factories
+# Context factories
 ###
 
 
-def get_import_context(field_converter=standard_importer, **options):
-    import_options = {
-        'field_converter': field_converter,
-        'partial': False,
-        'strict': False,
-        'convert': True,
-        'validate': False,
-        'new': False,
-        'oo': False
-    }
-    import_options.update(options)
-    return Context(**import_options)
+_import_option_defaults = {
+    'trusted_data'     : {},
+    'mapping'          : {},
+    'partial'          : True,
+    'strict'           : False,
+    'convert'          : True,
+    'validate'         : False,
+    'new'              : False,
+    'oo'               : False,
+    'recursive'        : False,
+}
 
 
-def get_export_context(field_converter, **options):
-    export_options = {
-        'field_converter': field_converter,
-        'export_level': None
-    }
-    export_options.update(options)
-    return Context(**export_options)
+def get_import_context(field_converter=standard_importer,
+                       init=False, app_data=None, context=None, **options):
+    context = Context._make(context)
+    if not context.initialized:
+        if type(field_converter) is types.FunctionType:
+            field_converter = BasicConverter(field_converter)
+        context._setdefaults(options)
+        context._setdefaults({
+            'field_converter' : field_converter,
+            'init_values'     : init,
+            'apply_defaults'  : init,
+            'app_data'        : app_data if app_data is not None else {},
+        })
+        context._setdefaults(_import_option_defaults)
+    return context
+
+
+_export_option_defaults = {
+    'export_level'         : None,
+    'role'                 : None,
+    'raise_error_on_role'  : True,
+}
+
+
+def get_export_context(field_converter, app_data=None, context=None, **options):
+    context = Context._make(context)
+    if not context.initialized:
+        if type(field_converter) is types.FunctionType:
+            field_converter = BasicConverter(field_converter)
+        context._setdefaults(options)
+        context._setdefaults({
+            'field_converter' : field_converter,
+            'app_data'        : app_data if app_data is not None else {},
+        })
+        context._setdefaults(_export_option_defaults)
+    return context
 
 
 
@@ -530,21 +523,27 @@ def get_export_context(field_converter, **options):
 
 
 def convert(cls, instance_or_dict, field_converter=standard_importer, **kwargs):
-    return import_loop(cls, instance_or_dict, field_converter, **kwargs)
+    context = get_import_context(field_converter, **kwargs)
+    return import_loop(cls, instance_or_dict, context)
 
 
 def export(cls, instance_or_dict, field_converter, **kwargs):
-    return export_loop(cls, instance_or_dict, field_converter, **kwargs)
+    context = get_export_context(field_converter, **kwargs)
+    return export_loop(cls, instance_or_dict, context)
 
 
 def to_native(cls, instance_or_dict, **kwargs):
-    return export_loop(cls, instance_or_dict, native_exporter, **kwargs)
+    context = get_export_context(native_exporter, **kwargs)
+    return export_loop(cls, instance_or_dict, context)
 
 
 def to_primitive(cls, instance_or_dict, **kwargs):
-    return export_loop(cls, instance_or_dict, primitive_exporter, **kwargs)
+    context = get_export_context(primitive_exporter, **kwargs)
+    return export_loop(cls, instance_or_dict, context)
 
 
+
+from .validate import validate_model
 
 __all__ = module_exports(__name__)
 
